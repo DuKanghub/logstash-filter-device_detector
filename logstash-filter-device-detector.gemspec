@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name          = 'logstash-filter-device_detector'
-  s.version       = '0.1.1'
+  s.version       = '0.1.2'
   s.licenses      = ['Apache-2.0']
   s.summary       = '使用device_detector解析useragent的logstash-filter插件.'
   s.description   = 'Detects a vast amount of different devices automaticly based on regex rules.'

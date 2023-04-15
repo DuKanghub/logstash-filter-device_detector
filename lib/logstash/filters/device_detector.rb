@@ -53,11 +53,16 @@ class LogStash::Filters::DeviceDetector < LogStash::Filters::Base
       mozilla = false
       model = true
       platform = "Other"
-      os = "Other"
+      os_full = "Other"
       engine = ""
       engine_version = ""
       browser = ""
       browser_version = ""
+      browser_full = ""
+      os_name = ""
+      os_version = ""
+      device_name = ""
+      device_brand = ""
 
       if data.device_type =~ /phone/
         is_mobile = true
@@ -70,18 +75,43 @@ class LogStash::Filters::DeviceDetector < LogStash::Filters::Base
       if data.device_type
         platform = data.device_type
       end
-      if data.os_full_version
-        os = "#{data.os_name} #{data.os_full_version}"
+      if data.device_brand
+        device_brand = data.device_brand
       end
-      if data.name
-        browser = data.name
-        if data.name =~ /irefox/
-          mozilla = true
+      if data.device_name
+        device_name = data.device_name
+      end
+      if data.os_name && data.os_full_version
+        os_name = data.os_name
+        os_version = data.os_full_version
+        os_full = "#{os_name} #{os_version}"
+      else
+        if data.os_name
+          os_name = data.os_name
+          os_full = os_name
+        end
+        if data.os_full_version
+          os_version = data.os_full_version
         end
       end
-      if data.full_version
+
+      if data.name && data.full_version
+        browser = data.name
         browser_version = data.full_version
+        browser_full = "#{browser},#{browser_version}"
+      else
+        if data.name
+          browser = data.name
+          browser_full = browser
+        end
+        if data.full_version
+          browser_version = data.full_version
+        end
       end
+      if browser =~ /firefox/i
+        mozilla = true
+      end
+
       # 构造输出哈希表
       output = {
         "isMobile" => is_mobile,
@@ -89,25 +119,35 @@ class LogStash::Filters::DeviceDetector < LogStash::Filters::Base
         "mozilla" => mozilla,
         "model" => model,
         "platform" => platform,
-        "os" => os,
+        "os" => os_full,
         "engine" => engine,
         "engineVersion" => engine_version,
         "browser" => browser,
         "browserVersion" => browser_version
       }
+      target_hash = {
+        "browser" => {
+          "name" => browser,
+          "version" =>browser_version
+        },
+        "os" => {
+          "name" => os_name,
+          "version" => os_version
+        },
+        "device" => {
+          "name" => device_name,
+          "brand" => device_brand,
+          "type" => platform
+        }
+      }
+      if is_bot
+        target_hash['bot_name'] = spider
+      end
       event.set("httpUserAgentJson", output.to_json)
-      event.set("os", os)
-      event.set("browser", "#{browser},#{browser_version}")
+      event.set("os", os_full)
+      event.set("browser", browser_full)
       event.set("spider", spider)
-      event.set("#{@target}[browser][name]", data.name) if data.name
-      event.set("#{@target}[browser][version]", data.full_version) if data.full_version
-      event.set("#{@target}[os][name]", data.os_name) if data.os_name
-      event.set("#{@target}[os][version]", data.os_full_version) if data.os_full_version
-      event.set("#{@target}[device][name]", data.device_name) if data.device_name
-      event.set("#{@target}[device][brand]", data.device_brand) if data.device_brand
-      event.set("#{@target}[device][type]", data.device_type) if data.device_type
-      event.set("#{@target}[bot][name]", data.bot_name) if data.bot_name
-      event.set("#{@target}[bot][name]", data.bot_name) if data.bot_name
+      event.set("#{@target}", target_hash)
     rescue StandardError => e
       @logger.error("Uknown error while setting device data", :exception => e, :field => @source, :event => event)
       return
